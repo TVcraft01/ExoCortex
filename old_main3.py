@@ -1,4 +1,4 @@
-# main.py - EXOCORTEX VERSION INTELLIGENTE AMÉLIORÉE
+# main.py - EXOCORTEX VERSION INTELLIGENTE
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox
@@ -12,33 +12,9 @@ import psutil
 import shutil
 from pathlib import Path
 import tempfile
-import requests
-from datetime import datetime
-
-# Import des nouveaux modules IA (avec gestion des erreurs)
-try:
-    from core.advanced_assistant import AdvancedAssistant
-    print("✅ Assistant avancé chargé")
-except ImportError as e:
-    print(f"⚠️ Assistant avancé non disponible: {e}")
-    AdvancedAssistant = None
-
-try:
-    from ai.deepseek_api import DeepSeekAPI
-    print("✅ DeepSeek API chargée")
-except ImportError as e:
-    print(f"⚠️ DeepSeek API non disponible: {e}")
-    DeepSeekAPI = None
-
-try:
-    from ai.gemini_api import GeminiAPI
-    print("✅ Gemini API chargée")
-except ImportError as e:
-    print(f"⚠️ Gemini API non disponible: {e}")
-    GeminiAPI = None
 
 class ExocortexApp:
-    """EXOCORTEX - Agent intelligent avec sélection IA et permissions améliorées"""
+    """EXOCORTEX - Agent intelligent qui scanne puis nettoie"""
     
     def __init__(self):
         # Configuration
@@ -48,22 +24,14 @@ class ExocortexApp:
         self.root = ctk.CTk()
         self._setup_window()
         
-        # Configuration utilisateur (avec options IA)
+        # Configuration utilisateur
         self.config = {
             "language": "fr",
-            "ai_provider": "local",  # local, deepseek, gemini
-            "api_key": "",
-            "use_internet": True,
             "apps_permissions": {},
             "system_access": True,
             "privacy_mode": False,
-            "scan_complete": False,
-            "personality": "professionnel",
-            "max_messages": 100
+            "scan_complete": False
         }
-        
-        # Applications essentielles (toujours activées par défaut)
-        self.essential_apps = ["notepad.exe", "calc.exe", "explorer.exe"]
         
         # Scanner initial COMPLET
         self._perform_full_scan()
@@ -102,7 +70,7 @@ class ExocortexApp:
         scan_thread.start()
         
     def _full_system_scan(self):
-        """Scan exhaustif de TOUT le système avec déduplication"""
+        """Scan exhaustif de TOUT le système"""
         try:
             print("📁 Scanning Windows Registry...")
             registry_apps = self._deep_scan_registry()
@@ -120,29 +88,19 @@ class ExocortexApp:
             running_apps = self._deep_scan_running_processes()
             self.scan_cache["running_apps"] = running_apps
             
-            # Combiner TOUT avec déduplication AVANCÉE
+            # Combiner TOUT
             all_apps = []
             seen_paths = set()
-            seen_names = set()
             
             for app_list in [registry_apps, program_apps, system_apps, running_apps]:
                 for app in app_list:
-                    # Normaliser le chemin pour éviter les doublons
-                    if app["path"]:
-                        norm_path = os.path.normcase(os.path.normpath(app["path"]))
-                        
-                        # Vérifier doublons par chemin ET nom
-                        if (norm_path not in seen_paths and 
-                            app["name"] not in seen_names and
-                            len(app["name"]) > 1):  # Éviter les noms vides
-                            
-                            all_apps.append(app)
-                            seen_paths.add(norm_path)
-                            seen_names.add(app["name"])
+                    if app["path"] not in seen_paths:
+                        all_apps.append(app)
+                        seen_paths.add(app["path"])
             
             self.scan_cache["all_apps"] = all_apps
             
-            print(f"✅ Scan complet terminé: {len(all_apps)} applications uniques trouvées")
+            print(f"✅ Scan complet terminé: {len(all_apps)} applications trouvées")
             self.config["scan_complete"] = True
             
         except Exception as e:
@@ -202,15 +160,11 @@ class ExocortexApp:
                                     continue
                             
                             if name and exe_path and os.path.exists(exe_path):
-                                # Désactiver par défaut (sauf apps essentielles)
-                                app_name_lower = name.lower()
-                                is_essential = any(essential in app_name_lower for essential in ["notepad", "calc", "explorer", "bloc-notes", "calculatrice"])
-                                
                                 apps.append({
                                     "name": name[:40],
                                     "path": exe_path,
                                     "type": "installée",
-                                    "default_enabled": is_essential
+                                    "default_enabled": True
                                 })
                             
                             winreg.CloseKey(subkey)
@@ -276,7 +230,6 @@ class ExocortexApp:
                                     
                                     if os.path.exists(full_path):
                                         app_name = os.path.splitext(os.path.basename(file))[0]
-                                        # Désactiver par défaut
                                         apps.append({
                                             "name": app_name[:30],
                                             "path": full_path,
@@ -292,7 +245,7 @@ class ExocortexApp:
         return apps[:100]  # Limiter à 100 max
         
     def _deep_scan_system_apps(self):
-        """Scan des applications système avec seulement les essentielles activées"""
+        """Scan des applications système"""
         apps = []
         windows_dir = os.environ.get('SystemRoot', 'C:\\Windows')
         
@@ -317,13 +270,11 @@ class ExocortexApp:
         for name, exe in system_apps:
             exe_path = os.path.join(windows_dir, "System32", exe)
             if os.path.exists(exe_path):
-                # Activer seulement les apps essentielles par défaut
-                is_essential = exe in self.essential_apps
                 apps.append({
                     "name": name,
                     "path": exe_path,
                     "type": "système",
-                    "default_enabled": is_essential  # False pour les autres
+                    "default_enabled": True
                 })
                 
         return apps
@@ -335,12 +286,11 @@ class ExocortexApp:
             for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
                 try:
                     if proc.info['exe'] and proc.info['name']:
-                        # Désactiver par défaut
                         apps.append({
                             "name": proc.info['name'].replace('.exe', ''),
                             "path": proc.info['exe'],
                             "type": "en cours",
-                            "default_enabled": False
+                            "default_enabled": True
                         })
                 except:
                     continue
@@ -409,7 +359,7 @@ class ExocortexApp:
             fg_color="#00FF00",
             hover_color="#00CC00",
             text_color="#000000",
-            command=self._show_ai_screen
+            command=self._show_apps_screen
         )
         self.continue_btn.pack(fill="x", pady=(20, 10))
         
@@ -421,136 +371,8 @@ class ExocortexApp:
         print(f"🌐 Langue sélectionnée: {lang_code}")
         self.config["language"] = lang_code
         
-    def _show_ai_screen(self):
-        """Écran 2: Sélection de l'IA"""
-        self._clear_screen()
-        
-        main_frame = ctk.CTkFrame(self.root, fg_color="#000000")
-        main_frame.pack(fill="both", expand=True, padx=20, pady=30)
-        
-        # Logo
-        ctk.CTkLabel(
-            main_frame,
-            text="EXOCORTEX",
-            font=("Segoe UI", 32, "bold"),
-            text_color="#00FF00"
-        ).pack(pady=(0, 20))
-        
-        # Titre
-        ctk.CTkLabel(
-            main_frame,
-            text="Choisissez votre IA",
-            font=("Segoe UI", 18),
-            text_color="#FFFFFF"
-        ).pack(pady=(0, 30))
-        
-        # Options IA
-        self.ai_var = tk.StringVar(value="local")
-        
-        ai_options = [
-            ("🤖 DeepSeek (Recommandé)", "deepseek"),
-            ("🌟 Gemini (Google)", "gemini"),
-            ("🔧 Local (Mode démo)", "local")
-        ]
-        
-        for text, value in ai_options:
-            frame = ctk.CTkFrame(main_frame, fg_color="#111111", height=50)
-            frame.pack(fill="x", pady=4)
-            
-            ctk.CTkLabel(
-                frame,
-                text=text,
-                font=("Segoe UI", 15),
-                text_color="#FFFFFF"
-            ).pack(side="left", padx=15)
-            
-            ctk.CTkRadioButton(
-                frame,
-                text="",
-                variable=self.ai_var,
-                value=value,
-                fg_color="#00FF00",
-                hover_color="#00CC00",
-                width=30,
-                height=30
-            ).pack(side="right", padx=15)
-        
-        # Frame pour la clé API
-        api_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        api_frame.pack(fill="x", pady=20)
-        
-        ctk.CTkLabel(
-            api_frame,
-            text="Clé API (optionnel - pour DeepSeek/Gemini):",
-            font=("Segoe UI", 14),
-            text_color="#888888"
-        ).pack(anchor="w", pady=(0, 5))
-        
-        self.api_key_entry = ctk.CTkEntry(
-            api_frame,
-            placeholder_text="sk-...",
-            height=40,
-            font=("Segoe UI", 14),
-            show="*"
-        )
-        self.api_key_entry.pack(fill="x", pady=5)
-        
-        # Case à cocher pour utiliser internet
-        self.use_internet_var = tk.BooleanVar(value=True)
-        ctk.CTkCheckBox(
-            api_frame,
-            text="Utiliser internet pour les requêtes IA",
-            variable=self.use_internet_var,
-            fg_color="#00FF00",
-            hover_color="#00CC00",
-            font=("Segoe UI", 13)
-        ).pack(anchor="w", pady=10)
-        
-        # Info sur les APIs
-        info_text = """📝 Pour les APIs externes :
-• DeepSeek: https://platform.deepseek.com/api_keys
-• Gemini: https://makersuite.google.com/app/apikey
-
-En mode local, aucune connexion internet requise."""
-        
-        ctk.CTkLabel(
-            api_frame,
-            text=info_text,
-            font=("Segoe UI", 11),
-            text_color="#666666",
-            justify="left"
-        ).pack(anchor="w", pady=10)
-        
-        # Bouton Continuer
-        ctk.CTkButton(
-            main_frame,
-            text="Continuer →",
-            font=("Segoe UI", 16, "bold"),
-            height=50,
-            fg_color="#00FF00",
-            hover_color="#00CC00",
-            text_color="#000000",
-            command=self._save_ai_config
-        ).pack(fill="x", pady=(20, 10))
-        
-        # Barre de progression
-        self._create_progress_bar(main_frame, 2)
-        
-    def _save_ai_config(self):
-        """Sauvegarde la configuration IA"""
-        self.config["ai_provider"] = self.ai_var.get()
-        self.config["api_key"] = self.api_key_entry.get()
-        self.config["use_internet"] = self.use_internet_var.get()
-        
-        print(f"🤖 IA sélectionnée: {self.config['ai_provider']}")
-        print(f"🔑 Clé API: {'Oui' if self.config['api_key'] else 'Non'}")
-        print(f"🌐 Internet: {'Activé' if self.config['use_internet'] else 'Désactivé'}")
-        
-        # Aller à l'écran des permissions
-        self._show_apps_screen()
-        
     def _show_apps_screen(self):
-        """Écran 3: Permissions d'applications avec bouton minimum"""
+        """Écran 2: Permissions d'applications"""
         self._clear_screen()
         
         # Attendre que le scan soit complet si nécessaire
@@ -629,20 +451,6 @@ En mode local, aucune connexion internet requise."""
         self.full_access_switch.pack(side="right", padx=15)
         self.full_access_switch.select()
         
-        # BOUTON AUTORISER LE MINIMUM
-        ctk.CTkButton(
-            content_frame,
-            text="✅ Autoriser le minimum (Apps essentielles)",
-            font=("Segoe UI", 14),
-            height=40,
-            fg_color="transparent",
-            hover_color="#111111",
-            text_color="#00FF00",
-            border_color="#00FF00",
-            border_width=1,
-            command=self._set_minimum_permissions
-        ).pack(fill="x", pady=(10, 20))
-        
         # Liste des applications (du scan complet)
         self.apps_container = ctk.CTkFrame(content_frame, fg_color="transparent")
         self.apps_container.pack(fill="x", pady=10)
@@ -652,7 +460,7 @@ En mode local, aucune connexion internet requise."""
         
         # Afficher les applications du scan
         all_apps = self.scan_cache["all_apps"]
-        print(f"📊 Affichage de {len(all_apps)} applications uniques")
+        print(f"📊 Affichage de {len(all_apps)} applications")
         
         for app in all_apps:
             app_frame = ctk.CTkFrame(self.apps_container, fg_color="#111111", height=50)
@@ -741,28 +549,7 @@ En mode local, aucune connexion internet requise."""
         self.finish_btn.pack(fill="x", pady=(10, 5))
         
         # Barre de progression
-        self._create_progress_bar(content_frame, 3)
-        
-    def _set_minimum_permissions(self):
-        """Active seulement les apps essentielles"""
-        print("✅ Configuration minimale activée")
-        
-        # Désactiver TOUT d'abord
-        for app_path, app_data in self.app_toggles.items():
-            app_data["var"].set(False)
-        
-        # Activer seulement les apps essentielles
-        essential_keywords = ["notepad", "calc", "explorer", "bloc-notes", "calculatrice", "explorateur"]
-        
-        for app_path, app_data in self.app_toggles.items():
-            app_name_lower = app_data["name"].lower()
-            if any(essential in app_name_lower for essential in essential_keywords):
-                app_data["var"].set(True)
-                print(f"  ✅ Activé: {app_data['name']}")
-        
-        # Afficher un message
-        messagebox.showinfo("Configuration minimale", 
-                          "✅ Seules les applications essentielles ont été activées :\n• Bloc-notes\n• Calculatrice\n• Explorateur")
+        self._create_progress_bar(content_frame, 2)
         
     def _show_loading_screen(self):
         """Écran de chargement pendant le scan"""
@@ -865,22 +652,16 @@ En mode local, aucune connexion internet requise."""
             if not os.path.exists(config_dir):
                 os.makedirs(config_dir)
                 
-            config_path = os.path.join(config_dir, "exocortex_config.json")
+            config_path = os.path.join(config_dir, "exocortex_clean.json")
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
                 
-            print(f"💾 Configuration sauvegardée: {config_path}")
-            
-            # Sauvegarder aussi un backup
-            backup_path = os.path.join(config_dir, f"exocortex_backup_{int(time.time())}.json")
-            with open(backup_path, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, indent=2, ensure_ascii=False)
-                
+            print(f"💾 Configuration propre sauvegardée: {config_path}")
         except Exception as e:
             print(f"⚠️ Erreur sauvegarde: {e}")
             
     def _launch_main_interface(self):
-        """Lance l'interface principale avec l'assistant avancé"""
+        """Lance l'interface principale"""
         # Fermer la fenêtre de configuration
         self.root.destroy()
         
@@ -896,7 +677,7 @@ En mode local, aucune connexion internet requise."""
         # Texte
         ctk.CTkLabel(
             prog_frame,
-            text=f"Étape {step}/3 • Scan: {len(self.scan_cache.get('all_apps', []))} apps",
+            text=f"Étape {step}/2 • Scan: {len(self.scan_cache.get('all_apps', []))} apps",
             font=("Segoe UI", 12),
             text_color="#666666"
         ).pack()
@@ -912,18 +693,11 @@ En mode local, aucune connexion internet requise."""
 
 
 class ExocortexMainInterface:
-    """Interface principale avec assistant IA avancé"""
+    """Interface principale avec chat, apps et monitoring"""
     
     def __init__(self, config, scan_cache):
         self.config = config
         self.scan_cache = scan_cache
-        
-        # Initialiser l'assistant avancé
-        self.assistant = AdvancedAssistant(config)
-        
-        # Gestion des fichiers
-        self.pending_files = []
-        self.file_upload_frame = None
         
         # Fenêtre principale
         self.root = ctk.CTk()
@@ -958,17 +732,6 @@ class ExocortexMainInterface:
             text_color="#00FF00"
         ).pack(side="left", padx=20, pady=15)
         
-        # Bouton paramètres IA
-        ctk.CTkButton(
-            header,
-            text="⚙️",
-            width=40,
-            height=40,
-            fg_color="transparent",
-            hover_color="#222222",
-            command=self._show_ai_settings
-        ).pack(side="right", padx=10, pady=10)
-        
         # Bouton rafraîchir
         ctk.CTkButton(
             header,
@@ -978,7 +741,7 @@ class ExocortexMainInterface:
             fg_color="transparent",
             hover_color="#222222",
             command=self._refresh_apps
-        ).pack(side="right", padx=5, pady=10)
+        ).pack(side="right", padx=10, pady=10)
         
         # Onglets
         self.tabview = ctk.CTkTabview(
@@ -1004,14 +767,14 @@ class ExocortexMainInterface:
         self._setup_monitoring_tab()
         
     def _setup_chat_tab(self):
-        """Configure l'onglet Chat avec assistant avancé"""
+        """Configure l'onglet Chat"""
         frame = self.tabview.tab("💬 Chat")
         
         # Zone de messages avec scroll
         self.chat_frame = ctk.CTkScrollableFrame(
             frame,
             fg_color="#000000",
-            height=350
+            height=400
         )
         self.chat_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
@@ -1024,11 +787,10 @@ class ExocortexMainInterface:
         welcome.pack(fill="x", pady=10)
         
         welcome_text = "🎯 **EXOCORTEX ACTIVÉ**\n\n"
-        welcome_text += f"• IA: {self.config['ai_provider'].upper()}\n"
         welcome_text += f"• Langue: {self.config['language']}\n"
         welcome_text += f"• Apps activées: {len(self.config['apps_permissions'])}\n"
-        welcome_text += f"• Internet: {'✅' if self.config['use_internet'] else '❌'}\n\n"
-        welcome_text += "💬 Tapez votre message ou dites 'Hey EXOCORTEX'"
+        welcome_text += f"• Accès système: {'✅' if self.config['system_access'] else '❌'}\n\n"
+        welcome_text += "🎤 Dites 'Hey EXOCORTEX' ou tapez un message"
         
         ctk.CTkLabel(
             welcome,
@@ -1038,25 +800,9 @@ class ExocortexMainInterface:
             justify="left"
         ).pack(padx=15, pady=15)
         
-        # Frame pour upload de fichiers
-        self.file_upload_frame = ctk.CTkFrame(frame, fg_color="#111111", height=40)
-        
         # Zone de saisie
         input_frame = ctk.CTkFrame(frame, fg_color="#111111", height=80)
         input_frame.pack(fill="x", side="bottom", padx=10, pady=10)
-        
-        # Bouton fichiers
-        self.file_btn = ctk.CTkButton(
-            input_frame,
-            text="📎",
-            width=50,
-            height=50,
-            font=("Segoe UI", 20),
-            fg_color="#333333",
-            hover_color="#444444",
-            command=self._upload_files
-        )
-        self.file_btn.pack(side="left", padx=(10, 5))
         
         # Microphone
         self.mic_btn = ctk.CTkButton(
@@ -1065,11 +811,11 @@ class ExocortexMainInterface:
             width=50,
             height=50,
             font=("Segoe UI", 20),
-            fg_color="#333333",
-            hover_color="#444444",
+            fg_color="#00FF00",
+            hover_color="#00CC00",
             command=self._toggle_microphone
         )
-        self.mic_btn.pack(side="left", padx=5)
+        self.mic_btn.pack(side="left", padx=(10, 5))
         
         # Champ texte
         self.chat_input = ctk.CTkEntry(
@@ -1092,148 +838,6 @@ class ExocortexMainInterface:
             hover_color="#00CC00",
             command=self._send_message
         ).pack(side="right", padx=(5, 10))
-        
-    def _upload_files(self):
-        """Ouvre un dialogue pour uploader des fichiers"""
-        from tkinter import filedialog
-        
-        files = filedialog.askopenfilenames(
-            title="Sélectionnez des fichiers",
-            filetypes=[
-                ("Tous les fichiers", "*.*"),
-                ("Images", "*.png *.jpg *.jpeg *.gif *.bmp"),
-                ("Documents", "*.pdf *.doc *.docx *.txt"),
-                ("Code", "*.py *.js *.html *.css *.json"),
-                ("Exécutables", "*.exe *.msi")
-            ]
-        )
-        
-        if files:
-            self.pending_files = list(files)
-            self._add_chat_message("system", f"📎 {len(files)} fichier(s) sélectionné(s)")
-            self._update_file_upload_display()
-            
-    def _clear_pending_files(self):
-        """Efface les fichiers en attente"""
-        self.pending_files = []
-        self._add_chat_message("system", "📎 Fichiers effacés")
-        self._update_file_upload_display()
-        
-    def _update_file_upload_display(self):
-        """Met à jour l'affichage des fichiers"""
-        if self.file_upload_frame:
-            if self.pending_files:
-                file_text = f"📎 {len(self.pending_files)} fichier(s) prêt(s)"
-                for widget in self.file_upload_frame.winfo_children():
-                    widget.destroy()
-                    
-                ctk.CTkLabel(
-                    self.file_upload_frame,
-                    text=file_text,
-                    font=("Segoe UI", 12),
-                    text_color="#00FF00"
-                ).pack(side="left", padx=10, pady=5)
-                
-                ctk.CTkButton(
-                    self.file_upload_frame,
-                    text="❌",
-                    width=30,
-                    height=30,
-                    fg_color="#FF5555",
-                    hover_color="#CC4444",
-                    command=self._clear_pending_files
-                ).pack(side="right", padx=10, pady=5)
-                
-                self.file_upload_frame.pack(fill="x", padx=10, pady=(5, 0))
-            else:
-                self.file_upload_frame.pack_forget()
-        
-    def _show_ai_settings(self):
-        """Affiche les paramètres IA"""
-        settings_window = ctk.CTkToplevel(self.root)
-        settings_window.title("Paramètres IA")
-        settings_window.geometry("300x400")
-        settings_window.configure(fg_color="#000000")
-        settings_window.resizable(False, False)
-        
-        # Centrer
-        settings_window.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 150
-        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 200
-        settings_window.geometry(f'300x400+{x}+{y}')
-        
-        # Titre
-        ctk.CTkLabel(
-            settings_window,
-            text="⚙️ Paramètres IA",
-            font=("Segoe UI", 20, "bold"),
-            text_color="#00FF00"
-        ).pack(pady=20)
-        
-        # Info IA actuelle
-        stats = self.assistant.get_stats()
-        
-        info_text = f"""IA actuelle: {self.config['ai_provider'].upper()}
-        
-📊 Statistiques:
-• Messages: {stats['message_count']}/{stats['max_messages']}
-• Restants: {stats['remaining_messages']}
-• Historique: {stats['conversation_history_length']} entrées
-
-📁 Fichiers en attente: {stats['pending_files']}"""
-        
-        ctk.CTkLabel(
-            settings_window,
-            text=info_text,
-            font=("Segoe UI", 12),
-            text_color="#FFFFFF",
-            justify="left"
-        ).pack(pady=10, padx=20)
-        
-        # Bouton réinitialiser conversation
-        ctk.CTkButton(
-            settings_window,
-            text="🔄 Réinitialiser conversation",
-            font=("Segoe UI", 14),
-            height=40,
-            fg_color="#333333",
-            hover_color="#444444",
-            command=self._reset_conversation
-        ).pack(pady=10, padx=20, fill="x")
-        
-        # Bouton changer IA
-        ctk.CTkButton(
-            settings_window,
-            text="🤖 Changer d'IA",
-            font=("Segoe UI", 14),
-            height=40,
-            fg_color="#00FF00",
-            hover_color="#00CC00",
-            text_color="#000000",
-            command=self._change_ai_provider
-        ).pack(pady=10, padx=20, fill="x")
-        
-        # Bouton fermer
-        ctk.CTkButton(
-            settings_window,
-            text="Fermer",
-            font=("Segoe UI", 14),
-            height=40,
-            fg_color="#FF5555",
-            hover_color="#CC4444",
-            command=settings_window.destroy
-        ).pack(pady=10, padx=20, fill="x")
-        
-    def _reset_conversation(self):
-        """Réinitialise la conversation"""
-        result = self.assistant.reset_conversation()
-        self._add_chat_message("system", result)
-        
-    def _change_ai_provider(self):
-        """Ouvre une fenêtre pour changer d'IA"""
-        messagebox.showinfo("Changer d'IA", 
-                          "Pour changer d'IA, veuillez redémarrer l'application.\n\n"
-                          "Vous pourrez sélectionner une nouvelle IA au démarrage.")
         
     def _setup_apps_tab(self):
         """Configure l'onglet Apps"""
@@ -1320,11 +924,11 @@ class ExocortexMainInterface:
         
         # Exemples d'activités
         activities = [
-            ("🔍 Scan système", "Terminé"),
+            ("🔍 Scan système", "Terminé - " + time.strftime("%H:%M")),
             ("📱 Apps activées", f"{len(self.config['apps_permissions'])} applications"),
-            ("🤖 IA", self.config['ai_provider'].upper()),
-            ("🌐 Internet", "✅" if self.config['use_internet'] else "❌"),
-            ("💾 Configuration", "Sauvegardée")
+            ("🌐 Langue", self.config['language']),
+            ("🔒 Sécurité", "Mode surveillance activé"),
+            ("💾 Données", "Configuration sauvegardée")
         ]
         
         for activity, detail in activities:
@@ -1469,11 +1073,11 @@ class ExocortexMainInterface:
             self.mic_btn.configure(text="🔴", fg_color="#FF5555")
             self._add_chat_message("system", "🎤 Microphone activé - Parlez maintenant")
         else:
-            self.mic_btn.configure(text="🎤", fg_color="#333333")
+            self.mic_btn.configure(text="🎤", fg_color="#00FF00")
             self._add_chat_message("system", "🎤 Microphone désactivé")
             
     def _send_message(self):
-        """Envoie un message à l'assistant"""
+        """Envoie un message"""
         message = self.chat_input.get().strip()
         if not message:
             return
@@ -1481,26 +1085,8 @@ class ExocortexMainInterface:
         self.chat_input.delete(0, "end")
         self._add_chat_message("user", message)
         
-        # Traiter avec l'assistant avancé
-        self.root.after(100, lambda: self._process_with_assistant(message))
-        
-    def _process_with_assistant(self, message):
-        """Traite le message avec l'assistant avancé"""
-        try:
-            # Traiter avec les fichiers si disponibles
-            files = self.pending_files.copy() if self.pending_files else None
-            response = self.assistant.process(message, files)
-            
-            # Effacer les fichiers après traitement
-            if files:
-                self.pending_files = []
-                self._update_file_upload_display()
-            
-            self._add_chat_message("assistant", response)
-            
-        except Exception as e:
-            error_msg = f"❌ Erreur de traitement: {str(e)}"
-            self._add_chat_message("assistant", error_msg)
+        # Réponse simulée
+        self.root.after(1000, lambda: self._simulate_response(message))
         
     def _add_chat_message(self, sender, text):
         """Ajoute un message au chat"""
@@ -1525,6 +1111,26 @@ class ExocortexMainInterface:
         
         # Défiler vers le bas
         self.chat_frame._parent_canvas.yview_moveto(1.0)
+        
+    def _simulate_response(self, message):
+        """Simule une réponse de l'IA"""
+        responses = {
+            "bonjour": "👋 Bonjour ! Comment puis-je vous aider ?",
+            "heure": f"🕐 Il est {time.strftime('%H:%M')}",
+            "apps": f"📱 Vous avez {len(self.config['apps_permissions'])} applications activées",
+            "aide": "💡 Je peux vous aider à:\n• Lancer des applications\n• Surveiller votre système\n• Répondre à vos questions",
+            "merci": "😊 Avec plaisir !"
+        }
+        
+        message_lower = message.lower()
+        response = "🤖 J'ai bien reçu votre message. Comment puis-je vous assister ?"
+        
+        for key, resp in responses.items():
+            if key in message_lower:
+                response = resp
+                break
+                
+        self._add_chat_message("assistant", response)
         
     def _start_monitoring(self):
         """Démarre la surveillance système"""
@@ -1587,13 +1193,5 @@ class ExocortexMainInterface:
 
 # Lancement
 if __name__ == "__main__":
-    print("🚀 Lancement d'EXOCORTEX...")
-    print("📁 Structure vérifiée:")
-    
-    # Vérifier les répertoires
-    for dir_name in ["data", "data/notes", "data/screenshots", "data/conversations"]:
-        os.makedirs(dir_name, exist_ok=True)
-        print(f"  ✅ {dir_name}")
-    
     app = ExocortexApp()
     app.run()

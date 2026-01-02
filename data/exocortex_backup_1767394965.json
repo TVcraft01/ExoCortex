@@ -1,0 +1,19 @@
+{
+  "language": "en",
+  "ai_provider": "local",
+  "api_key": "",
+  "use_internet": true,
+  "apps_permissions": {
+    "Deezer 7.1.20": "C:\\Users\\james\\AppData\\Local\\Programs\\deezer-desktop\\Deezer.exe",
+    "Discord": "C:\\Users\\james\\AppData\\Local\\Discord\\Update.exe",
+    "Blockbench 5.0.7": "C:\\Users\\james\\AppData\\Local\\Programs\\Blockbench\\Blockbench.exe",
+    "Ollama version 0.12.3": "C:\\Users\\james\\AppData\\Local\\Programs\\Ollama\\unins000.exe",
+    "Calculatrice": "C:\\WINDOWS\\System32\\calc.exe",
+    "Bloc-notes": "C:\\WINDOWS\\System32\\notepad.exe"
+  },
+  "system_access": true,
+  "privacy_mode": false,
+  "scan_complete": true,
+  "personality": "professionnel",
+  "max_messages": 100
+}
